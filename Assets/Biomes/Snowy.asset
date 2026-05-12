@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d51bdc3312be0346a0956a749392c35, type: 3}
-  m_Name: BiomeSnowy
+  m_Name: Snowy
   m_EditorClassIdentifier: Assembly-CSharp::TileAtlas
   grass: {fileID: 11400000, guid: 6b4c9a1534657094d8da249806eb167a, type: 2}
   dirt: {fileID: 11400000, guid: 36aa2440bfb218740a9d35d45675640b, type: 2}

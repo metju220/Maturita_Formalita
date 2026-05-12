@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d51bdc3312be0346a0956a749392c35, type: 3}
-  m_Name: BiomeDesert
+  m_Name: Grasslands
   m_EditorClassIdentifier: Assembly-CSharp::TileAtlas
-  grass: {fileID: 11400000, guid: f3c1cf1f1c9ea5f4d8e20c3c90104b87, type: 2}
-  dirt: {fileID: 11400000, guid: f3c1cf1f1c9ea5f4d8e20c3c90104b87, type: 2}
+  grass: {fileID: 11400000, guid: 654f87503c8a6a944a322080363cc14f, type: 2}
+  dirt: {fileID: 11400000, guid: 36aa2440bfb218740a9d35d45675640b, type: 2}
   snowDirt: {fileID: 0}
   sand: {fileID: 0}
   stone: {fileID: 11400000, guid: 3545fd5b33138ee45978f31199dcd0fa, type: 2}
