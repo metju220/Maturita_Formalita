@@ -1,202 +1,141 @@
 using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
-
 
 public class TerrainGeneration : MonoBehaviour
 {
-    [Header("Tile Atlas")]
-    public TileAtlas tileAtlas;
-    public float seed;
-    
-    public BiomeClass[] biomes;
+    [Header("References")]
+    public WorldData worldData;
+    public ChunkRenderer chunkRenderer;
 
     [Header("Biomes")]
-    public float biomeFreq;
-    public Gradient biomeGradient;
-    public Texture2D biomeMap;
+    public BiomeClass[] biomes;
 
-    [Header("Generation Settings")]
-    public int worldSize = 128;
-    public int chunkSize = 16;
-    public bool caveGen = true;
-    public int dirtLayer = 4;
-    public float surfaceValue = 0.25f;
-    public float heightMultiplier = 4f;
-    public int heightAddition = 25;
+    [Header("World Settings")]
+    public float seed;
 
-    [Header("Noise Settings")]
-    public float caveFreq = 0.05f;
+    [Header("Terrain")]
     public float terrainFreq = 0.05f;
-    public Texture2D caveNoiseTexture;
+    public float heightMultiplier = 5f;
+    public int heightAddition = 20;
 
-    [Header("Ore Settings")]
-    public OreClass[] ores;
-
-    private GameObject[] worldChunks;
-    private List<Vector2> worldTiles = new List<Vector2>();
-    private BiomeClass curBiome;
-
-    void OnValidate()
+    private void OnValidate()
     {
-        DrawTextures();
+        if (biomes == null) return;
+
+        foreach (var biome in biomes)
+        {
+            // 1. Vygeneruje náhled jeskyní pro biome
+            biome.GenerateCavePreview(seed);
+
+            // 2. Vygeneruje náhledy pro všechny rudy v tomto biomu
+            if (biome.ores != null)
+            {
+                for (int i = 0; i < biome.ores.Length; i++)
+                {
+                    biome.ores[i].GeneratePreview(seed, i);
+                }
+            }
+        }
     }
 
     private void Start()
     {
-        seed = Random.Range(-10000, 10000);
+        seed = Random.Range(-10000f, 10000f);
 
-        DrawTextures();
-        CreateChunks();
-        GenerateTerrain();
+        worldData.Initialize();
+
+        GenerateWorld();
+
+        chunkRenderer.DrawWorld(worldData);
     }
 
-    public BiomeClass GetCurrentBiome(int x, int y)
+    void GenerateWorld()
     {
-        for (int i = 0; i < biomes.Length; i++)
+        for (int x = 0; x < worldData.worldWidth; x++)
         {
-            if (biomes[i].biomeCol == biomeMap.GetPixel(x, y))
+            BiomeClass biome = GetBiome(x);
+            int terrainHeight = Mathf.FloorToInt(
+                Mathf.PerlinNoise((x + seed) * biome.terrainFreq, 0) * biome.heightMultiplier) + heightAddition;
+
+            for (int y = 0; y < worldData.worldHeight; y++)
             {
-                return biomes[i];
-            }
-        }
-        return curBiome;
-    }
+                if (y > terrainHeight)
+                    continue;
 
-    public void DrawTextures()
-    {
-            biomeMap = new Texture2D(worldSize, worldSize);
-            DrawBiomeTexture();
-
-        for(int i = 0; i < biomes.Length; i++)
-        {
-            biomes[i].caveNoiseTexture = new Texture2D(worldSize, worldSize);
-            for(int o = 0; o< biomes[i].ores.Length; o++)
-            {
-                biomes[i].ores[o].spread = new Texture2D(worldSize, worldSize);
-            }
-
-            GenerateNoiseTexture(biomes[i].caveFreq, biomes[i].surfaceValue, biomes[i].caveNoiseTexture);
-
-            //Ores
-            for(int o = 0; o< biomes[i].ores.Length; o++)
-            {
-                GenerateNoiseTexture(biomes[i].ores[o].rarity, biomes[i].ores[o].veinSize, biomes[i].ores[o].spread);
-            }
-        }
-    }
-
-    public void CreateChunks()
-    {
-        int numChunks = worldSize / chunkSize;
-        worldChunks = new GameObject[numChunks];
-        for(int i = 0; i < numChunks; i++)
-        {
-            GameObject newChunk = new GameObject(name = i.ToString());
-            newChunk.name = i.ToString();
-            newChunk.transform.SetParent(transform);
-            worldChunks[i] = newChunk;
-        }
-    }
-
-    public void DrawBiomeTexture()
-    {
-        for(int x = 0; x < biomeMap.width; x++)
-        {
-            for(int y = 0; y < biomeMap.height; y++)
-            {
-                float v = Mathf.PerlinNoise((x + seed) * biomeFreq, seed * biomeFreq);
-                Color col = biomeGradient.Evaluate(v);
-                biomeMap.SetPixel(x, y, col);
-            }
-        }
-        biomeMap.Apply();
-    }
-    
-
-    public void GenerateTerrain()
-    {
-        Sprite[] tileSprite;
-        for(int x = 0; x < worldSize; x++)
-        {
-            float height = Mathf.PerlinNoise((x + seed) * terrainFreq, seed * terrainFreq) * heightMultiplier + heightAddition;
-
-            for(int y = 0; y < height; y++)
-            {
-                if(y < height - dirtLayer)
+                bool cave = false;
+                if (biome.generateCaves)
                 {
-                    curBiome = GetCurrentBiome(x, y);
-                    tileSprite = curBiome.tileAtlas.stone.tileSprite;
-
-                    if(ores[0].spread.GetPixel(x, y).r > 0.05f && height - y > ores[0].maxHeightSpawn)
-                        tileSprite = tileAtlas.coal.tileSprite;
-
-                    if(ores[1].spread.GetPixel(x, y).r > 0.05f && height - y > ores[1].maxHeightSpawn)
-                        tileSprite = tileAtlas.iron.tileSprite;
-
-                    if(ores[2].spread.GetPixel(x, y).r > 0.05f && height - y > ores[2].maxHeightSpawn)
-                        tileSprite = tileAtlas.gold.tileSprite;
-                }
-                else if(y < height - 1)
-                {
-                    tileSprite = curBiome.tileAtlas.dirt.tileSprite;
-                }
-                else
-                {
-                    tileSprite = curBiome.tileAtlas.grass.tileSprite;
-                }
-
-                if (caveGen)
-                {
-                    if(caveNoiseTexture.GetPixel(x, y).r > 0.05f)
+                    if (y >= biome.minCaveHeight && y <= biome.maxCaveHeight)
                     {
-                        PlaceTile(tileSprite, x , y);
+                        float noiseA = Mathf.PerlinNoise((x + seed) * biome.caveFreq, (y + seed) * biome.caveFreq);
+                        float caveMask = Mathf.PerlinNoise((x + seed + 100f) * (biome.caveFreq * 0.2f), (y + seed + 100f) * (biome.caveFreq * 0.2f));
+
+                        // Pokud je hodnota blízko 0.5, "vykopeme" jeskyni
+                        if (Mathf.Abs(noiseA - 0.5f) < biome.surfaceValue && caveMask > 0.45f)
+                        {
+                            cave = true;
+                        }
                     }
                 }
-                else
-                {
-                    PlaceTile(tileSprite, x , y);
-                }
+
+                if (cave && y < terrainHeight - 3)
+                    continue;
+
+                GenerateBlock(x, y, terrainHeight, biome);
             }
         }
-
-
     }
 
-    public void GenerateNoiseTexture(float frequency, float limit, Texture2D noiseTexture)
+    void GenerateBlock(int x, int y, int height, BiomeClass biome)
     {
-        for(int x = 0; x < noiseTexture.width; x++)
+        int blockID = 0;
+
+        if (y == height)
         {
-            for(int y = 0; y < noiseTexture.height; y++)
+            blockID = 1; // grass
+        }
+        else if (y > height - biome.dirtLayer)
+        {
+            blockID = 2; // dirt
+        }
+        else
+        {
+            blockID = GenerateOre(x, y, biome);
+        }
+
+        worldData.SetBlock(x, y, blockID);
+    }
+
+    int GenerateOre(int x, int y, BiomeClass biome)
+    {
+        for (int i = 0; i < biome.ores.Length; i++)
+        {
+            OreClass ore = biome.ores[i];
+
+            if (y > ore.maxHeightSpawn) continue;
+
+            float noise = Mathf.PerlinNoise(
+                (x + seed + i * 1000) * ore.rarity,
+                (y + seed + i * 1000) * ore.rarity
+            );
+
+            // Čím VYŠŠÍ veinSize, tím MÉNĚ rudy bude
+            if (noise > ore.veinSize)
             {
-                float v = Mathf.PerlinNoise((x + seed) * frequency, (y + seed) * frequency);
-                if(v > limit)
-                    noiseTexture.SetPixel(x, y, Color.white);
-                else
-                    noiseTexture.SetPixel(x, y, Color.black);
-                
+                return 4 + i;
             }
         }
-        noiseTexture.Apply();
+
+        return 3; // Stone
     }
 
-    public void PlaceTile(Sprite[] tileSprite, int x, int y)
+    BiomeClass GetBiome(int x)
     {
-        if(!worldTiles.Contains(new Vector2Int(x, y)))
-        {
-            GameObject newTile = new GameObject();
+        float noise = Mathf.PerlinNoise((x + seed) * 0.01f, seed * 0.01f);
 
-            int chunkCoord = Mathf.RoundToInt(x / chunkSize) * chunkSize;
-            chunkCoord /= chunkSize;
+        int index = Mathf.FloorToInt(noise * biomes.Length);
 
-            newTile.transform.SetParent(worldChunks[chunkCoord].transform);
+        index = Mathf.Clamp(index, 0, biomes.Length - 1);
 
-            int spriteIndex = Random.Range(0, tileSprite.Length);
-            newTile.AddComponent<SpriteRenderer>();
-            newTile.GetComponent<SpriteRenderer>().sprite = tileSprite[spriteIndex];
-
-            newTile.name = tileSprite[spriteIndex].name;
-            newTile.transform.position = new Vector2(x + 0.5f, y + 0.5f);
-        }
+        return biomes[index];
     }
 }

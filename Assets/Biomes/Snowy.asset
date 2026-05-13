@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d51bdc3312be0346a0956a749392c35, type: 3}
   m_Name: Snowy
   m_EditorClassIdentifier: Assembly-CSharp::TileAtlas
-  grass: {fileID: 11400000, guid: 6b4c9a1534657094d8da249806eb167a, type: 2}
-  dirt: {fileID: 11400000, guid: 36aa2440bfb218740a9d35d45675640b, type: 2}
+  grass: {fileID: 11400000, guid: c5b067430b594fe498ae29d3e882f2e9, type: 2}
+  dirt: {fileID: 11400000, guid: 3a951820794bccb4480c04df957fb67e, type: 2}
   snowDirt: {fileID: 0}
   sand: {fileID: 0}
-  stone: {fileID: 11400000, guid: 3545fd5b33138ee45978f31199dcd0fa, type: 2}
-  coal: {fileID: 11400000, guid: 9e78fc584c241c14c9d3d97674b5500f, type: 2}
-  iron: {fileID: 11400000, guid: 769b3056d8fb7144e98c70d05577d652, type: 2}
-  gold: {fileID: 11400000, guid: 1cd0968543ce20e4697c6eac444f6ab0, type: 2}
+  stone: {fileID: 11400000, guid: 6f687b2c9330b0d48819d2d1cd677bd1, type: 2}
+  coal: {fileID: 11400000, guid: dc1fa07f542036d45b5f19d9b492d441, type: 2}
+  iron: {fileID: 11400000, guid: 0e543c025da351c4d88477def4620b14, type: 2}
+  gold: {fileID: 11400000, guid: 0de81df20c3c9574ca8419b86187ac8e, type: 2}
