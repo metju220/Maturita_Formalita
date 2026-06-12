@@ -4,35 +4,58 @@ using UnityEngine;
 public class OreClass
 {
     public string oreName;
-    public float rarity;
-    public float veinSize;
-    public int maxHeightSpawn;
+
+    // Block ID klíč - musí existovat v BlockRegistry
+    // Např. "coal", "iron", "gold", "diamond"
+    [Tooltip("Block ID z BlockRegistry")]
+    public string blockID = "coal";
+    public string BlockID = "iron";
+
+    // rarity: frekvence šumu - NÍZKÁ hodnota = větší, roztahanější žíly
+    //                          VYSOKÁ hodnota = menší, hustěji rozmístěné žíly
+    [Range(0.01f, 0.5f)]
+    public float rarity = 0.05f;
+
+    // veinSize: práh detekce - NÍZKÁ hodnota = více rudy
+    //                          VYSOKÁ hodnota (blíž k 1.0) = méně rudy
+    [Range(0.5f, 0.99f)]
+    public float veinSize = 0.80f;
+
+    // Ruda se negeneruje nad touto výškou (y >= maxHeightSpawn = žádná ruda)
+    public int maxHeightSpawn = 20;
+
     public Texture2D spread;
 
-    // Tato funkce vygeneruje náhled šumu do textury
+    // Vygeneruje preview texturu do Inspectoru
+    // Bílá pixely = kde se bude ruda generovat
     public void GeneratePreview(float seed, int index)
     {
-        // Tady změníš 100, 100 na 128, 128
-        if (spread == null || spread.width != 128 || spread.height != 128)
+        const int texSize = 128;
+
+        if (spread == null
+            || spread.width  != texSize
+            || spread.height != texSize)
         {
-            spread = new Texture2D(128, 128);
-            // Volitelné: Nastavíme ostrost textury (Point je pro pixel-art nejlepší)
+            spread = new Texture2D(texSize, texSize);
             spread.filterMode = FilterMode.Point;
         }
 
-        for (int x = 0; x < spread.width; x++)
+        for (int x = 0; x < texSize; x++)
         {
-            for (int y = 0; y < spread.height; y++)
+            for (int y = 0; y < texSize; y++)
             {
+                // Každá ruda má vlastní offset (index * 1000) aby se nepřekrývaly
                 float noise = Mathf.PerlinNoise(
-                    (x + seed + index * 1000) * rarity,
-                    (y + seed + index * 1000) * rarity
+                    (x + seed + index * 1000f) * rarity,
+                    (y + seed + index * 1000f) * rarity
                 );
 
+                // Bílá = ruda přítomna (noise > veinSize)
                 Color color = noise > veinSize ? Color.white : Color.black;
                 spread.SetPixel(x, y, color);
             }
         }
+
         spread.Apply();
     }
 }

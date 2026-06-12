@@ -4,7 +4,7 @@ using UnityEngine.Tilemaps;
 public class ChunkRenderer : MonoBehaviour
 {
     public Tilemap tilemap;
-    public TileBase[] tiles;
+    public BlockRegistry blockRegistry;
 
     public void DrawWorld(WorldData worldData)
     {
@@ -14,12 +14,19 @@ public class ChunkRenderer : MonoBehaviour
         {
             for (int y = 0; y < worldData.worldHeight; y++)
             {
-                int id = worldData.GetBlock(x, y);
+                string blockID = worldData.GetBlock(x, y);
 
-                if (id > 0 && id < tiles.Length)
+                if (string.IsNullOrEmpty(blockID))
+                    continue;
+
+                TileBase tile = blockRegistry.GetTile(blockID);
+                if (tile == null)
                 {
-                    tilemap.SetTile(new Vector3Int(x, y, 0), tiles[id]);
+                    Debug.LogWarning($"ChunkRenderer: Block '{blockID}' nemá tile v BlockRegistry!");
+                    continue;
                 }
+
+                tilemap.SetTile(new Vector3Int(x, y, 0), tile);
             }
         }
     }

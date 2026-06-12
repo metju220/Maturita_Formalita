@@ -1,37 +1,44 @@
 using UnityEngine;
+using System.Linq;
+
+[System.Serializable]
+public class BiomeEntry
+{
+    public BiomeClass biome;
+    [Tooltip("Jak často se biom bude vyskytovat (vyšší = více)]")]
+    [Range(0.1f, 10f)]
+    public float weight = 1f;
+}
 
 public class TerrainGeneration : MonoBehaviour
 {
     [Header("References")]
     public WorldData worldData;
     public ChunkRenderer chunkRenderer;
+    public BlockRegistry blockRegistry;
 
     [Header("Biomes")]
-    public BiomeClass[] biomes;
+    public BiomeEntry[] biomes;
 
     [Header("World Settings")]
     public float seed;
-
-    [Header("Terrain")]
-    public float terrainFreq = 0.05f;
-    public float heightMultiplier = 5f;
-    public int heightAddition = 20;
+    public int heightAddition = 0;
 
     private void OnValidate()
     {
         if (biomes == null) return;
 
-        foreach (var biome in biomes)
+        foreach (var entry in biomes)
         {
-            // 1. Vygeneruje náhled jeskyní pro biome
-            biome.GenerateCavePreview(seed);
+            if (entry.biome == null) continue;
 
-            // 2. Vygeneruje náhledy pro všechny rudy v tomto biomu
-            if (biome.ores != null)
+            entry.biome.GenerateCavePreview(seed);
+
+            if (entry.biome.ores != null)
             {
-                for (int i = 0; i < biome.ores.Length; i++)
+                for (int i = 0; i < entry.biome.ores.Length; i++)
                 {
-                    biome.ores[i].GeneratePreview(seed, i);
+                    entry.biome.ores[i].GeneratePreview(seed, i);
                 }
             }
         }
@@ -53,49 +60,70 @@ public class TerrainGeneration : MonoBehaviour
         for (int x = 0; x < worldData.worldWidth; x++)
         {
             BiomeClass biome = GetBiome(x);
+            if (biome == null) continue;
+
             int terrainHeight = Mathf.FloorToInt(
-                Mathf.PerlinNoise((x + seed) * biome.terrainFreq, 0) * biome.heightMultiplier) + heightAddition;
+                Mathf.PerlinNoise((x + seed) * biome.terrainFreq, 0f) * biome.heightMultiplier
+            ) + heightAddition;
+
+            // Clamp výšky terénu aby nepřesáhl svět
+            terrainHeight = Mathf.Clamp(terrainHeight, 1, worldData.worldHeight - 1);
 
             for (int y = 0; y < worldData.worldHeight; y++)
             {
+                // Nad terénem nic negeneruj
                 if (y > terrainHeight)
                     continue;
 
-                bool cave = false;
-                if (biome.generateCaves)
+                // Jeskyně logika - OPRAVA: přeskočíme blok (=jeskyně) jen když:
+                // 1. Biom má jeskyně povoleny
+                // 2. Jsme ve správné výškové zóně
+                // 3. Nejsme příliš blízko povrchu (ochrana povrchu = dirtLayer + 1)
+                if (biome.generateCaves
+                    && y >= biome.minCaveHeight
+                    && y <= Mathf.Min(biome.maxCaveHeight, terrainHeight - biome.dirtLayer - 1))
                 {
-                    if (y >= biome.minCaveHeight && y <= biome.maxCaveHeight)
-                    {
-                        float noiseA = Mathf.PerlinNoise((x + seed) * biome.caveFreq, (y + seed) * biome.caveFreq);
-                        float caveMask = Mathf.PerlinNoise((x + seed + 100f) * (biome.caveFreq * 0.2f), (y + seed + 100f) * (biome.caveFreq * 0.2f));
-
-                        // Pokud je hodnota blízko 0.5, "vykopeme" jeskyni
-                        if (Mathf.Abs(noiseA - 0.5f) < biome.surfaceValue && caveMask > 0.45f)
-                        {
-                            cave = true;
-                        }
-                    }
+                    if (IsCave(x, y, biome))
+                        continue; // tento blok je jeskyně -> přeskočit (prázdno)
                 }
-
-                if (cave && y < terrainHeight - 3)
-                    continue;
 
                 GenerateBlock(x, y, terrainHeight, biome);
             }
         }
     }
 
-    void GenerateBlock(int x, int y, int height, BiomeClass biome)
+    // Vrátí true pokud má být na pozici (x,y) jeskyně
+    bool IsCave(int x, int y, BiomeClass biome)
     {
-        int blockID = 0;
+        // Worm-cave algoritmus: hledáme hodnoty blízko 0.5 ve dvou vrstvách šumu
+        float noiseA = Mathf.PerlinNoise(
+            (x + seed) * biome.caveFreq,
+            (y + seed) * biome.caveFreq
+        );
 
-        if (y == height)
+        // Druhá vrstva slouží jako maska - zabraňuje příliš velkým otevřeným prostorám
+        float caveMask = Mathf.PerlinNoise(
+            (x + seed + 100f) * (biome.caveFreq * 0.2f),
+            (y + seed + 100f) * (biome.caveFreq * 0.2f)
+        );
+
+        bool isWorm = Mathf.Abs(noiseA - 0.5f) < biome.surfaceValue;
+        bool maskOk  = caveMask > 0.45f;
+
+        return isWorm && maskOk;
+    }
+
+    void GenerateBlock(int x, int y, int terrainHeight, BiomeClass biome)
+    {
+        string blockID;
+
+        if (y == terrainHeight)
         {
-            blockID = 1; // grass
+            blockID = biome.blockSurface;
         }
-        else if (y > height - biome.dirtLayer)
+        else if (y > terrainHeight - biome.dirtLayer)
         {
-            blockID = 2; // dirt
+            blockID = biome.blockSubsurface;
         }
         else
         {
@@ -105,37 +133,53 @@ public class TerrainGeneration : MonoBehaviour
         worldData.SetBlock(x, y, blockID);
     }
 
-    int GenerateOre(int x, int y, BiomeClass biome)
+    // Vrátí block ID pro danou pozici - buď ID rudy nebo ID kamene
+    string GenerateOre(int x, int y, BiomeClass biome)
     {
+        if (biome.ores == null || biome.ores.Length == 0)
+            return biome.blockDeep;
+
         for (int i = 0; i < biome.ores.Length; i++)
         {
             OreClass ore = biome.ores[i];
 
-            if (y > ore.maxHeightSpawn) continue;
+            if (y > ore.maxHeightSpawn)
+                continue;
 
             float noise = Mathf.PerlinNoise(
-                (x + seed + i * 1000) * ore.rarity,
-                (y + seed + i * 1000) * ore.rarity
+                (x + seed + i * 1000f) * ore.rarity,
+                (y + seed + i * 1000f) * ore.rarity
             );
 
-            // Čím VYŠŠÍ veinSize, tím MÉNĚ rudy bude
             if (noise > ore.veinSize)
-            {
-                return 4 + i;
-            }
+                return ore.blockID;
         }
 
-        return 3; // Stone
+        return biome.blockDeep;
     }
 
+    // Vrátí biom pro daný X coordinate pomocí Perlin noise a vah biomů
     BiomeClass GetBiome(int x)
     {
+        if (biomes == null || biomes.Length == 0)
+        {
+            Debug.LogError("TerrainGeneration: Nejsou přiřazeny žádné biomy!");
+            return null;
+        }
+
         float noise = Mathf.PerlinNoise((x + seed) * 0.01f, seed * 0.01f);
 
-        int index = Mathf.FloorToInt(noise * biomes.Length);
+        float totalWeight = biomes.Sum(b => b.weight);
+        float target = noise * totalWeight;
+        float cumulative = 0f;
 
-        index = Mathf.Clamp(index, 0, biomes.Length - 1);
+        foreach (var entry in biomes)
+        {
+            cumulative += entry.weight;
+            if (target <= cumulative)
+                return entry.biome;
+        }
 
-        return biomes[index];
+        return biomes[biomes.Length - 1].biome;
     }
 }
