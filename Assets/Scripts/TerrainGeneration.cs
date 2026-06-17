@@ -71,7 +71,6 @@ public class TerrainGeneration : MonoBehaviour
 
             for (int y = 0; y < worldData.worldHeight; y++)
             {
-                // Nad terénem nic negeneruj
                 if (y > terrainHeight)
                     continue;
 
