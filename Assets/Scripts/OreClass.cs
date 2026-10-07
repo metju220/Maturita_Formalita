@@ -9,7 +9,6 @@ public class OreClass
     // Např. "coal", "iron", "gold", "diamond"
     [Tooltip("Block ID z BlockRegistry")]
     public string blockID = "coal";
-    public string BlockID = "iron";
 
     // rarity: frekvence šumu - NÍZKÁ hodnota = větší, roztahanější žíly
     //                          VYSOKÁ hodnota = menší, hustěji rozmístěné žíly

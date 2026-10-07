@@ -12,4 +12,49 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac3d253f642f5a84c86904e18c4f6a45, type: 3}
   m_Name: BlockRegistry
   m_EditorClassIdentifier: Assembly-CSharp::BlockRegistry
-  blockDefinitions: []
+  blockDefinitions:
+  - blockID: 
+    tile: {fileID: 0}
+    isSolid: 0
+    isTransparent: 0
+    breakSound: 
+  - blockID: Grass_block
+    tile: {fileID: 11400000, guid: d69c8b59f46ec3a49af1343579a87b98, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
+  - blockID: Snow_dirt_block
+    tile: {fileID: 11400000, guid: c5b067430b594fe498ae29d3e882f2e9, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
+  - blockID: Sand
+    tile: {fileID: 11400000, guid: aaa462d7d7da10440a7de5046bf9f409, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
+  - blockID: Dirt_block
+    tile: {fileID: 11400000, guid: 3a951820794bccb4480c04df957fb67e, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
+  - blockID: Stone_block
+    tile: {fileID: 11400000, guid: 6f687b2c9330b0d48819d2d1cd677bd1, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
+  - blockID: Coal_ore
+    tile: {fileID: 11400000, guid: dc1fa07f542036d45b5f19d9b492d441, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
+  - blockID: Iron_ore
+    tile: {fileID: 11400000, guid: 0e543c025da351c4d88477def4620b14, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
+  - blockID: Gold_ore
+    tile: {fileID: 11400000, guid: 0de81df20c3c9574ca8419b86187ac8e, type: 2}
+    isSolid: 1
+    isTransparent: 0
+    breakSound: 
