@@ -7,6 +7,9 @@ public class WorldData : MonoBehaviour
     public int worldWidth  = 200; // Šířka světa
     public int worldHeight = 80;  // Výška světa
 
+    [Tooltip("Kolik spodních řad světa tvoří nezničitelný bedrock")]
+    public int bedrockLayers = 1;
+
     [HideInInspector]
     public string[,] blockMap; // 2D mřížka (X, Y) naplněná textovými ID bloků
 
@@ -53,5 +56,11 @@ public class WorldData : MonoBehaviour
     public bool IsInBounds(int x, int y)
     {
         return x >= 0 && x < worldWidth && y >= 0 && y < worldHeight;
+    }
+
+    // Jde blok na této pozici vytěžit? (bedrock na dně světa nejde)
+    public bool IsBreakable(int x, int y)
+    {
+        return IsInBounds(x, y) && y >= bedrockLayers;
     }
 }
