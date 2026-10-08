@@ -6,9 +6,9 @@ public class OreClass
     public string oreName;
 
     // Block ID klíč - musí existovat v BlockRegistry
-    // Např. "coal", "iron", "gold", "diamond"
+    // Např. "Coal_ore", "Iron_ore", "Gold_ore"
     [Tooltip("Block ID z BlockRegistry")]
-    public string blockID = "coal";
+    public string blockID = "Coal_ore";
 
     // rarity: frekvence šumu - NÍZKÁ hodnota = větší, roztahanější žíly
     //                          VYSOKÁ hodnota = menší, hustěji rozmístěné žíly
@@ -31,12 +31,16 @@ public class OreClass
     {
         const int texSize = 128;
 
+        // Textura je jen náhled - DontSave zajistí, že se neuloží do scény
+        // (při každém otevření se vygeneruje znovu v OnValidate)
         if (spread == null
+            || spread.hideFlags != HideFlags.DontSave
             || spread.width  != texSize
             || spread.height != texSize)
         {
             spread = new Texture2D(texSize, texSize);
             spread.filterMode = FilterMode.Point;
+            spread.hideFlags = HideFlags.DontSave;
         }
 
         for (int x = 0; x < texSize; x++)

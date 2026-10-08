@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -32,6 +33,8 @@ public class TerrainGeneration : MonoBehaviour
     public Texture2D biomePreviewTexture;
 
     [Header("World Settings")]
+    [Tooltip("Zapnuto = při každém spuštění nový náhodný svět. Vypnuto = použije se seed níže (stejný svět jde vygenerovat znovu).")]
+    public bool randomSeed = true;
     public float seed;
 
     [Header("Terrain Settings")]
@@ -40,32 +43,40 @@ public class TerrainGeneration : MonoBehaviour
     public int minTerrainHeight = 20;  // Minimální výška terénu
     public int maxTerrainHeight = 60;  // Maximální výška terénu
 
-    // Spustí se v editoru při změně hodnot (vygeneruje náhledy jeskyní/rud v unity inspectoru)
+    // Spustí se v editoru při změně hodnot (vygeneruje náhledy biomů a rud v unity inspectoru)
     private void OnValidate()
-    {   
+    {
         GenerateBiomePreview();
 
         if (biomeThresholds == null) return;
 
+        // Při duplikaci prvku pole v Inspectoru se zkopíruje i odkaz na texturu náhledu,
+        // takže by víc rud kreslilo do jedné textury. Sdílenou texturu proto zahodíme
+        // a GeneratePreview vytvoří pro danou rudu novou.
+        var usedPreviews = new HashSet<Texture2D>();
+
         foreach (var threshold in biomeThresholds)
         {
-            if (threshold.biome == null) continue;
-            threshold.biome.GenerateCavePreview(seed);
+            if (threshold.biome == null || threshold.biome.ores == null) continue;
 
-            if (threshold.biome.ores != null)
+            for (int i = 0; i < threshold.biome.ores.Length; i++)
             {
-                for (int i = 0; i < threshold.biome.ores.Length; i++)
-                {
-                    threshold.biome.ores[i].GeneratePreview(seed, i);
-                }
+                OreClass ore = threshold.biome.ores[i];
+
+                if (ore.spread != null && !usedPreviews.Add(ore.spread))
+                    ore.spread = null;
+
+                ore.GeneratePreview(seed, i);
             }
         }
     }
 
     private void Start()
     {
-        // 1. Náhodný seed pro nový svět
-        seed = Random.Range(-10000f, 10000f);
+        // 1. Seed světa - buď náhodný, nebo ten z Inspectoru
+        if (randomSeed)
+            seed = Random.Range(-10000f, 10000f);
+        Debug.Log($"[World] Seed: {seed}");
 
         // 2. Příprava polí pro data světa
         worldData.Initialize();
@@ -76,7 +87,10 @@ public class TerrainGeneration : MonoBehaviour
         // 4. Vykreslení vygenerovaných dat do Tilemapy
         chunkRenderer.DrawWorld(worldData);
 
-        // 5. Spawn hráče na povrch
+        // 5. Neviditelné stěny na okrajích mapy
+        CreateWorldBounds();
+
+        // 6. Spawn hráče na povrch
         SpawnPlayer();
     }
 
@@ -85,13 +99,16 @@ public class TerrainGeneration : MonoBehaviour
         int texWidth = 512;
         int texHeight = 64;
 
-        if (biomePreviewTexture == null 
-            || biomePreviewTexture.width != texWidth 
+        // DontSave = náhled se neukládá do scény, vždy se dopočítá znovu
+        if (biomePreviewTexture == null
+            || biomePreviewTexture.hideFlags != HideFlags.DontSave
+            || biomePreviewTexture.width != texWidth
             || biomePreviewTexture.height != texHeight)
         {
             biomePreviewTexture = new Texture2D(texWidth, texHeight);
             biomePreviewTexture.filterMode = FilterMode.Point;
             biomePreviewTexture.wrapMode = TextureWrapMode.Clamp;
+            biomePreviewTexture.hideFlags = HideFlags.DontSave;
         }
 
         // Projdeme texturu pixel po pixelu horizontálně
@@ -130,6 +147,21 @@ public class TerrainGeneration : MonoBehaviour
         player.position = new Vector3(spawnX + 0.5f, spawnY, player.position.z);
     }
 
+    // Vytvoří neviditelné stěny vlevo a vpravo od mapy, aby hráč nemohl vypadnout ze světa
+    void CreateWorldBounds()
+    {
+        GameObject bounds = new GameObject("WorldBounds");
+        float wallHeight = worldData.worldHeight * 2f; // s rezervou nad horním okrajem mapy
+
+        BoxCollider2D leftWall = bounds.AddComponent<BoxCollider2D>();
+        leftWall.offset = new Vector2(-0.5f, wallHeight / 2f);
+        leftWall.size = new Vector2(1f, wallHeight);
+
+        BoxCollider2D rightWall = bounds.AddComponent<BoxCollider2D>();
+        rightWall.offset = new Vector2(worldData.worldWidth + 0.5f, wallHeight / 2f);
+        rightWall.size = new Vector2(1f, wallHeight);
+    }
+
     // Hledá nejbližší povrchový blok kolem středu mapy směrem dolů/nahoru
     int FindSurfaceY(int startX)
     {
@@ -154,9 +186,8 @@ public class TerrainGeneration : MonoBehaviour
     void GenerateWorld()
     {
         GenerateHeightMap();
-        GenerateBasicTerrain();
+        GenerateTerrain();
         GenerateCavesWorm();
-        ApplyBiomes();
         ApplyOres();
     }
 
@@ -171,31 +202,25 @@ public class TerrainGeneration : MonoBehaviour
         }
     }
 
-    // Vyplní svět základem: na povrchu tráva, pod ní hlína, pak kámen
-    void GenerateBasicTerrain()
+    // Vyplní každý sloupec bloky podle biomu: povrch, podpovrchová vrstva, hornina a dole bedrock
+    void GenerateTerrain()
     {
         for (int x = 0; x < worldData.worldWidth; x++)
         {
+            BiomeClass biome = GetBiome(x); // Zjistí, jaký biom je na této X pozici
+            if (biome == null)
+            {
+                Debug.LogError("TerrainGeneration: Není nastavený žádný biom, svět nejde vygenerovat!");
+                return;
+            }
+
             int terrainHeight = worldData.heightMap[x];
 
-            for (int y = 0; y < worldData.worldHeight; y++)
+            for (int y = 0; y <= terrainHeight; y++) // Nad povrchem zůstává vzduch
             {
-                if (y > terrainHeight) continue; // Nad povrchem je vzduch (přeskočit)
-
-                string blockID = GetBlockForDepth(y, terrainHeight);
-                worldData.SetBlock(x, y, blockID);
+                worldData.SetBlock(x, y, GetBiomeBlock(y, terrainHeight, biome));
             }
         }
-    }
-
-    // Pomocná funkce pro určení základního bloku podle hloubky
-    string GetBlockForDepth(int y, int terrainHeight)
-    {
-        int depthFromSurface = terrainHeight - y;
-
-        if (depthFromSurface == 0) return "grass_forest"; // Úplný povrch
-        if (depthFromSurface <= 5) return "dirt";         // Vrstva pod povrchem
-        return "stone";                                   // Hluboké podzemí
     }
 
     // generátor jeskyní
@@ -204,31 +229,11 @@ public class TerrainGeneration : MonoBehaviour
         WormCaveGenerator.GenerateCaves(worldData, seed);
     }
 
-    // Projede svět a vymění základní bloky za specifické bloky daného biomu
-    void ApplyBiomes()
-    {
-        for (int x = 0; x < worldData.worldWidth; x++)
-        {
-            BiomeClass biome = GetBiome(x); // Zjistí, jaký biom je na této X pozici
-            if (biome == null) continue;
-
-            int terrainHeight = worldData.heightMap[x];
-
-            for (int y = 0; y <= terrainHeight; y++)
-            {
-                string currentBlockID = worldData.GetBlock(x, y);
-                if (string.IsNullOrEmpty(currentBlockID)) continue; // Jeskyně (vzduch) nepřepisujeme
-
-                // Nahradí původní blok biomovým ekvivalentem
-                string newBlockID = GetBiomeBlock(y, terrainHeight, biome, currentBlockID);
-                worldData.SetBlock(x, y, newBlockID);
-            }
-        }
-    }
-
     // Vrací správný blok pro biom na základě hloubky
-    string GetBiomeBlock(int y, int terrainHeight, BiomeClass biome, string currentBlock)
+    string GetBiomeBlock(int y, int terrainHeight, BiomeClass biome)
     {
+        if (y < worldData.bedrockLayers) return biome.blockBedrock; // Nezničitelné dno světa
+
         int depthFromSurface = terrainHeight - y;
 
         if (depthFromSurface == 0) return biome.blockSurface;       // Povrch biomu (např. písek v poušti)
@@ -248,7 +253,8 @@ public class TerrainGeneration : MonoBehaviour
 
             int terrainHeight = worldData.heightMap[x];
 
-            for (int y = 0; y < terrainHeight; y++)
+            // Od bedrocku výš - bedrock je stejný kámen jako blockDeep, ruda ho nesmí přepsat
+            for (int y = worldData.bedrockLayers; y < terrainHeight; y++)
             {
                 string currentBlockID = worldData.GetBlock(x, y);
 

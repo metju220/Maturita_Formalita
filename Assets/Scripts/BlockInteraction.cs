@@ -82,8 +82,8 @@ public class BlockInteraction : MonoBehaviour
         // Spočítá vzdálenost od hráče ke středu bloku
         float distance = Vector2.Distance(transform.position, new Vector2(blockX + 0.5f, blockY + 0.5f));
 
-        // Zkontroluje, jestli jsem v dosahu a v mapě
-        bool inRange = distance <= miningRadius && worldData.IsInBounds(blockX, blockY);
+        // Zkontroluje, jestli jsem v dosahu a jestli jde blok vytěžit (v mapě a není to bedrock)
+        bool inRange = distance <= miningRadius && worldData.IsBreakable(blockX, blockY);
         // Zkontroluje, jestli na tom místě vůbec nějaký blok je
         bool hasBlock = inRange && !string.IsNullOrEmpty(worldData.GetBlock(blockX, blockY));
 
@@ -108,10 +108,10 @@ public class BlockInteraction : MonoBehaviour
         int blockX = Mathf.FloorToInt(mouseWorldPos.x);
         int blockY = Mathf.FloorToInt(mouseWorldPos.y);
 
-        // Kontroly: dosah, hranice mapy a jestli tam je co ničit
+        // Kontroly: dosah, hranice mapy / bedrock a jestli tam je co ničit
         float distance = Vector2.Distance(transform.position, new Vector2(blockX + 0.5f, blockY + 0.5f));
         if (distance > miningRadius) return;
-        if (!worldData.IsInBounds(blockX, blockY)) return;
+        if (!worldData.IsBreakable(blockX, blockY)) return;
 
         string currentBlock = worldData.GetBlock(blockX, blockY);
         if (string.IsNullOrEmpty(currentBlock)) return;
