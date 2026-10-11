@@ -1,14 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 // Pomocná třída pro nastavení biomů v Inspectoru
 [System.Serializable]
 public class BiomeThreshold
 {
     public BiomeClass biome;       // Jaký biom to je (data)
-    //public float minNoise = 0f;    // Od jaké hodnoty šumu začíná
-    //public float maxNoise = 1f;    // Do jaké hodnoty šumu končí
 }
 
 public class TerrainGeneration : MonoBehaviour
@@ -20,16 +17,15 @@ public class TerrainGeneration : MonoBehaviour
     public Transform player;
 
     [Header("Biomes")]
-    public BiomeThreshold[] biomeThresholds; // Tady ti zůstanou přiřazené tvé biomy
+    public BiomeThreshold[] biomeThresholds;
 
     [Header("Biome Distribution (Gradient)")]
-    public Gradient biomeGradient; // Barevná lajna pro určování četnosti biomů
+    public Gradient biomeGradient;
 
     [Tooltip("Čím menší číslo, tím delší a větší biomy budou (původně 0.01f)")]
     public float biomeScale = 0.003f;
 
     [Header("Biome Preview")]
-    // Tady v inspectoru uvidíš krásný 512x64 pruh, jak jdou biomy za sebou
     public Texture2D biomePreviewTexture;
 
     [Header("World Settings")]
@@ -43,21 +39,25 @@ public class TerrainGeneration : MonoBehaviour
     public int minTerrainHeight = 20;  // Minimální výška terénu
     public int maxTerrainHeight = 60;  // Maximální výška terénu
 
-    // Spustí se v editoru při změně hodnot (vygeneruje náhledy biomů a rud v unity inspectoru)
+    // Preview biomů a ores
     private void OnValidate()
     {
         GenerateBiomePreview();
 
         if (biomeThresholds == null) return;
 
-        // Při duplikaci prvku pole v Inspectoru se zkopíruje i odkaz na texturu náhledu,
-        // takže by víc rud kreslilo do jedné textury. Sdílenou texturu proto zahodíme
-        // a GeneratePreview vytvoří pro danou rudu novou.
         var usedPreviews = new HashSet<Texture2D>();
 
         foreach (var threshold in biomeThresholds)
         {
-            if (threshold.biome == null || threshold.biome.ores == null) continue;
+            if (threshold.biome == null) continue;
+
+#if UNITY_EDITOR
+            // Upozorní v konzoli, pokud biom používá ID bloku, které není v BlockRegistry
+            threshold.biome.ValidateBlockIDs(blockRegistry);
+#endif
+
+            if (threshold.biome.ores == null) continue;
 
             for (int i = 0; i < threshold.biome.ores.Length; i++)
             {
@@ -81,16 +81,23 @@ public class TerrainGeneration : MonoBehaviour
         // 2. Příprava polí pro data světa
         worldData.Initialize();
 
-        // 3. Hlavní generování (krok za krokem)
+        // 3. Přeložení textových ID bloků v biomech a rudách na čísla z BlockRegistry
+        foreach (var threshold in biomeThresholds)
+        {
+            if (threshold.biome != null)
+                threshold.biome.ResolveBlockNumbers(blockRegistry);
+        }
+
+        // 4. Hlavní generování (krok za krokem)
         GenerateWorld();
 
-        // 4. Vykreslení vygenerovaných dat do Tilemapy
+        // 5. Vykreslení vygenerovaných dat do Tilemapy
         chunkRenderer.DrawWorld(worldData);
 
-        // 5. Neviditelné stěny na okrajích mapy
+        // 6. Neviditelné stěny na okrajích mapy
         CreateWorldBounds();
 
-        // 6. Spawn hráče na povrch
+        // 7. Spawn hráče na povrch
         SpawnPlayer();
     }
 
@@ -99,7 +106,6 @@ public class TerrainGeneration : MonoBehaviour
         int texWidth = 512;
         int texHeight = 64;
 
-        // DontSave = náhled se neukládá do scény, vždy se dopočítá znovu
         if (biomePreviewTexture == null
             || biomePreviewTexture.hideFlags != HideFlags.DontSave
             || biomePreviewTexture.width != texWidth
@@ -111,7 +117,6 @@ public class TerrainGeneration : MonoBehaviour
             biomePreviewTexture.hideFlags = HideFlags.DontSave;
         }
 
-        // Projdeme texturu pixel po pixelu horizontálně
         for (int x = 0; x < texWidth; x++)
         {
             // Simulujeme horizontální šum světa (používáme x přímo jako souřadnici světa)
@@ -135,19 +140,18 @@ public class TerrainGeneration : MonoBehaviour
     {
         if (player == null) return;
 
-        int spawnX = worldData.worldWidth / 2; // Střed mapy na ose X
-        int spawnY = FindSurfaceY(spawnX);     // Najde nejvyšší pevný blok
+        int spawnX = worldData.worldWidth / 2;
+        int spawnY = FindSurfaceY(spawnX);
 
         if (spawnY < 0) // Kdyby selhal vyhledávač, vezme výšku z heightmapy
         {
             spawnY = worldData.heightMap[spawnX] + 1;
         }
 
-        // Posune hráče na pozici (přidá 0.5f pro střed bloku)
         player.position = new Vector3(spawnX + 0.5f, spawnY, player.position.z);
     }
 
-    // Vytvoří neviditelné stěny vlevo a vpravo od mapy, aby hráč nemohl vypadnout ze světa
+    // Neviditelné stěny vlevo a vpravo od mapy
     void CreateWorldBounds()
     {
         GameObject bounds = new GameObject("WorldBounds");
@@ -162,7 +166,6 @@ public class TerrainGeneration : MonoBehaviour
         rightWall.size = new Vector2(1f, wallHeight);
     }
 
-    // Hledá nejbližší povrchový blok kolem středu mapy směrem dolů/nahoru
     int FindSurfaceY(int startX)
     {
         for (int offset = 0; offset < worldData.worldWidth; offset++)
@@ -172,9 +175,8 @@ public class TerrainGeneration : MonoBehaviour
                 if (x < 0 || x >= worldData.worldWidth) continue;
 
                 int terrainHeight = worldData.heightMap[x];
-                string blockAtSurface = worldData.GetBlock(x, terrainHeight);
 
-                if (!string.IsNullOrEmpty(blockAtSurface))
+                if (!worldData.IsAir(x, terrainHeight))
                 {
                     return terrainHeight + 2; // Vrátí pozici kousek nad blokem
                 }
@@ -230,15 +232,15 @@ public class TerrainGeneration : MonoBehaviour
     }
 
     // Vrací správný blok pro biom na základě hloubky
-    string GetBiomeBlock(int y, int terrainHeight, BiomeClass biome)
+    ushort GetBiomeBlock(int y, int terrainHeight, BiomeClass biome)
     {
-        if (y < worldData.bedrockLayers) return biome.blockBedrock; // Nezničitelné dno světa
+        if (y < worldData.bedrockLayers) return biome.bedrockBlock; // Nezničitelné dno světa
 
         int depthFromSurface = terrainHeight - y;
 
-        if (depthFromSurface == 0) return biome.blockSurface;       // Povrch biomu (např. písek v poušti)
-        if (depthFromSurface <= biome.dirtLayer) return biome.blockSubsurface; // Podpovrch biomu
-        return biome.blockDeep;                                      // Hluboký blok biomu
+        if (depthFromSurface == 0) return biome.surfaceBlock; // Povrch biomu (např. písek v poušti)
+        if (depthFromSurface <= biome.dirtLayer) return biome.subsurfaceBlock; // Podpovrch biomu
+        return biome.deepBlock; // Hluboký blok biomu
     }
 
     // Vygeneruje ložiska rud hluboko v zemi pomocí Perlin Noise
@@ -256,10 +258,10 @@ public class TerrainGeneration : MonoBehaviour
             // Od bedrocku výš - bedrock je stejný kámen jako blockDeep, ruda ho nesmí přepsat
             for (int y = worldData.bedrockLayers; y < terrainHeight; y++)
             {
-                string currentBlockID = worldData.GetBlock(x, y);
+                ushort currentBlockID = worldData.GetBlock(x, y);
 
-                if (string.IsNullOrEmpty(currentBlockID)) continue;
-                if (currentBlockID != biome.blockDeep) continue; // Rudy se generují JEN do hlubokého kamene
+                if (currentBlockID == BlockRegistry.Air) continue;
+                if (currentBlockID != biome.deepBlock) continue; // Rudy se generují JEN do hlubokého kamene
 
                 // Projede všechny dostupné rudy pro tento biom
                 for (int oreIndex = 0; oreIndex < biome.ores.Length; oreIndex++)
@@ -277,7 +279,7 @@ public class TerrainGeneration : MonoBehaviour
                     // Pokud šum překročí velikost žíly, umístí se ruda
                     if (noise > ore.veinSize)
                     {
-                        worldData.SetBlock(x, y, ore.blockID);
+                        worldData.SetBlock(x, y, ore.blockNumber);
                         totalOresPlaced++;
                         break; // Na jednom pixelu vygenerujeme max jednu rudu, jdeme na další
                     }
@@ -287,7 +289,7 @@ public class TerrainGeneration : MonoBehaviour
         Debug.Log($"[Ores] Total ore blocks placed: {totalOresPlaced}");
     }
 
-// Určí biom pro konkrétní X souřadnici podle horizontálního šumu a barvy z gradientu
+    // Určí biom pro konkrétní X souřadnici podle horizontálního šumu a barvy z gradientu
     BiomeClass GetBiome(int x)
     {
         if (biomeThresholds == null || biomeThresholds.Length == 0) return null;

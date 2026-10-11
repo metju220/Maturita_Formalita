@@ -10,6 +10,9 @@ public class OreClass
     [Tooltip("Block ID z BlockRegistry")]
     public string blockID = "Coal_ore";
 
+    // Číslo bloku z BlockRegistry - dopočítá se při startu (BiomeClass.ResolveBlockNumbers)
+    [System.NonSerialized] public ushort blockNumber;
+
     // rarity: frekvence šumu - NÍZKÁ hodnota = větší, roztahanější žíly
     //                          VYSOKÁ hodnota = menší, hustěji rozmístěné žíly
     [Range(0.01f, 0.5f)]
@@ -20,19 +23,15 @@ public class OreClass
     [Range(0.5f, 0.99f)]
     public float veinSize = 0.80f;
 
-    // Ruda se negeneruje nad touto výškou (y >= maxHeightSpawn = žádná ruda)
     public int maxHeightSpawn = 20;
 
     public Texture2D spread;
 
-    // Vygeneruje preview texturu do Inspectoru
-    // Bílá pixely = kde se bude ruda generovat
+    // preview texturu
     public void GeneratePreview(float seed, int index)
     {
         const int texSize = 128;
 
-        // Textura je jen náhled - DontSave zajistí, že se neuloží do scény
-        // (při každém otevření se vygeneruje znovu v OnValidate)
         if (spread == null
             || spread.hideFlags != HideFlags.DontSave
             || spread.width  != texSize
@@ -47,13 +46,12 @@ public class OreClass
         {
             for (int y = 0; y < texSize; y++)
             {
-                // Každá ruda má vlastní offset (index * 1000) aby se nepřekrývaly
+                // Každá ruda má vlastní offset aby se nepřekrývaly
                 float noise = Mathf.PerlinNoise(
                     (x + seed + index * 1000f) * rarity,
                     (y + seed + index * 1000f) * rarity
                 );
 
-                // Bílá = ruda přítomna (noise > veinSize)
                 Color color = noise > veinSize ? Color.white : Color.black;
                 spread.SetPixel(x, y, color);
             }

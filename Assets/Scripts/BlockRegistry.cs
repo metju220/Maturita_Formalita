@@ -8,76 +8,84 @@ using UnityEngine.Tilemaps;
 [CreateAssetMenu(fileName = "BlockRegistry", menuName = "World/Block Registry")]
 public class BlockRegistry : ScriptableObject
 {
+    public const ushort Air = 0;
+
     [System.Serializable]
     public class BlockDefinition
     {
-        public string blockID;      // Unikátní klíč, např. "grass_forest", "sand", "coal"
+        public string blockID;      // Unikátní klíč, např. "Grass_block", "Sand", "Coal_ore"
         public TileBase tile;       // Tile přiřazená v Inspectoru
-        public bool isSolid = true;
-        public bool isTransparent = false;
-
-        [Tooltip("Zvuk při rozbití (volitelné, pro budoucí použití)")]
-        public string breakSound;
     }
 
     [SerializeField]
-    public List<BlockDefinition> blockDefinitions = new List<BlockDefinition>();
-
-    // Runtime cache - postaví se při prvním dotazu
-    private Dictionary<string, BlockDefinition> _cache;
+    private List<BlockDefinition> blockDefinitions = new();
+    private Dictionary<string, ushort> _nameToNum;
+    private List<BlockDefinition> _numberToDef;
 
     private void BuildCache()
     {
-        _cache = new Dictionary<string, BlockDefinition>(blockDefinitions.Count);
+        _nameToNum = new Dictionary<string, ushort>();
+        _numberToDef = new List<BlockDefinition> { null };
+
         foreach (var def in blockDefinitions)
         {
             if (string.IsNullOrEmpty(def.blockID))
             {
-                Debug.LogWarning($"BlockRegistry: Blok bez ID nalezen, přeskakuji.");
+                Debug.LogWarning("BlockRegistry: Blok bez ID nalezen, přeskakuji.");
                 continue;
             }
-            if (_cache.ContainsKey(def.blockID))
+            if (_nameToNum.ContainsKey(def.blockID))
             {
                 Debug.LogWarning($"BlockRegistry: Duplicitní ID '{def.blockID}', přeskakuji.");
                 continue;
             }
-            _cache[def.blockID] = def;
+            
+            ushort num = (ushort)_numberToDef.Count;
+            _nameToNum[def.blockID] = num;
+            _numberToDef.Add(def);
         }
     }
 
-    // Vrátí TileBase pro dané ID. Vrátí null pokud ID neexistuje.
-    public TileBase GetTile(string blockID)
+    // Text na cislo
+    public ushort GetNumber(string blockID)
     {
-        if (string.IsNullOrEmpty(blockID)) return null;
+        if (_nameToNum == null) BuildCache();
 
-        if (_cache == null) BuildCache();
-
-        if (_cache.TryGetValue(blockID, out BlockDefinition def))
-            return def.tile;
-
-        Debug.LogWarning($"BlockRegistry: Neznámé block ID '{blockID}'");
-        return null;
+        if (!string.IsNullOrEmpty(blockID) && _nameToNum.TryGetValue(blockID, out ushort num))
+            return num;
+            
+        Debug.LogWarning($"BlockRegistry: Neznámé block ID '{blockID}', použiji vzduch.");
+        return Air;
     }
 
-    // Vrátí definici bloku (pro budoucí použití - zvuky, vlastnosti, atd.)
-    public BlockDefinition GetDefinition(string blockID)
+    // Cislo na text
+    public string GetName(ushort number)
     {
-        if (string.IsNullOrEmpty(blockID)) return null;
+        if (_numberToDef == null) BuildCache();
 
-        if (_cache == null) BuildCache();
+        if (number == Air || number >= _numberToDef.Count) return "Air";
+        return _numberToDef[number].blockID;
+    }
 
-        _cache.TryGetValue(blockID, out BlockDefinition def);
-        return def;
+    //Cislo na grafiku
+    public TileBase GetTile(ushort number)
+    {
+        if (_numberToDef == null) BuildCache();
+
+        if (number == Air || number >= _numberToDef.Count) return null;
+        return _numberToDef[number].tile;
     }
 
     public bool Exists(string blockID)
     {
-        if (_cache == null) BuildCache();
-        return !string.IsNullOrEmpty(blockID) && _cache.ContainsKey(blockID);
+        if (_nameToNum == null) BuildCache();
+        return !string.IsNullOrEmpty(blockID) && _nameToNum.ContainsKey(blockID);
     }
 
-    // Invaliduje cache - zavolej pokud změníš definice za runtime
-    public void InvalidateCache() => _cache = null;
-
-    private void OnValidate() => _cache = null;
+    // Při změně registru v Inspectoru se cache zahodí a příště postaví znovu
+    private void OnValidate() 
+    {
+        _nameToNum = null;
+        _numberToDef = null;
+    }
 }

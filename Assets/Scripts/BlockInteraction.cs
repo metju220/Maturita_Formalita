@@ -85,7 +85,7 @@ public class BlockInteraction : MonoBehaviour
         // Zkontroluje, jestli jsem v dosahu a jestli jde blok vytěžit (v mapě a není to bedrock)
         bool inRange = distance <= miningRadius && worldData.IsBreakable(blockX, blockY);
         // Zkontroluje, jestli na tom místě vůbec nějaký blok je
-        bool hasBlock = inRange && !string.IsNullOrEmpty(worldData.GetBlock(blockX, blockY));
+        bool hasBlock = inRange && !worldData.IsAir(blockX, blockY);
 
         if (hasBlock)
         {
@@ -113,10 +113,9 @@ public class BlockInteraction : MonoBehaviour
         if (distance > miningRadius) return;
         if (!worldData.IsBreakable(blockX, blockY)) return;
 
-        string currentBlock = worldData.GetBlock(blockX, blockY);
-        if (string.IsNullOrEmpty(currentBlock)) return;
+        if (worldData.IsAir(blockX, blockY)) return;
 
-        worldData.SetBlock(blockX, blockY, "");
-        chunkRenderer.UpdateTile(blockX, blockY, "");
+        worldData.SetBlock(blockX, blockY, BlockRegistry.Air);
+        chunkRenderer.UpdateTile(blockX, blockY, BlockRegistry.Air);
     }
 }

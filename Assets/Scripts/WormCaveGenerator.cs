@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 public class WormCaveGenerator
@@ -79,7 +78,7 @@ public class WormCaveGenerator
                             if (!worldData.IsAir(checkX, checkY))
                                 clearedCount++;
                             
-                            worldData.SetBlock(checkX, checkY, "");
+                            worldData.SetBlock(checkX, checkY, BlockRegistry.Air);
                         }
                     }
                 }

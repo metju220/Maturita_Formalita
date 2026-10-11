@@ -9,13 +9,11 @@ public class PlayerController : MonoBehaviour
 
     // Komponenty hrace
     private Rigidbody2D rb;
-    private SpriteRenderer spriteRenderer;
 
     private void Start()
     {
         // Načtení komponent hned na začátku
         rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     // Ošetření kdy můžu skákat

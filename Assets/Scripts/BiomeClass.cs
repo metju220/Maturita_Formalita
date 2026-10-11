@@ -23,28 +23,37 @@ public class BiomeClass
     public string blockBedrock    = "Stone_block";
 
     // ----------------------------------------------------------------
-    // Noise nastavení
-    // ----------------------------------------------------------------
-    [Header("Noise Settings")]
-    public float terrainFreq      = 0.05f;
-    public float caveFreq         = 0.05f;
-    public int   maxCaveHeight    = 30;
-    public int   minCaveHeight    = 5;
-
-    // ----------------------------------------------------------------
     // Generační nastavení
     // ----------------------------------------------------------------
     [Header("Generation Settings")]
-    public bool  generateCaves    = true;
+    [Tooltip("Kolik bloků pod povrchem tvoří podpovrchová vrstva (blockSubsurface)")]
     public int   dirtLayer        = 4;
-    public float surfaceValue     = 0.10f;
-    public float heightMultiplier = 4f;
 
     // ----------------------------------------------------------------
     // Rudy
     // ----------------------------------------------------------------
     [Header("Ore Settings")]
     public OreClass[] ores;
+    
+    [System.NonSerialized] public ushort surfaceBlock;
+    [System.NonSerialized] public ushort subsurfaceBlock;
+    [System.NonSerialized] public ushort deepBlock;
+    [System.NonSerialized] public ushort bedrockBlock;
+
+    // Přeloží textová ID biomu a jeho rud na čísla z BlockRegistry.
+    // Volá se jednou při startu hry, před generováním světa.
+    public void ResolveBlockNumbers(BlockRegistry registry)
+    {
+        surfaceBlock    = registry.GetNumber(blockSurface);
+        subsurfaceBlock = registry.GetNumber(blockSubsurface);
+        deepBlock       = registry.GetNumber(blockDeep);
+        bedrockBlock    = registry.GetNumber(blockBedrock);
+
+        if (ores == null) return;
+
+        foreach (var ore in ores)
+            ore.blockNumber = registry.GetNumber(ore.blockID);
+    }
 
 #if UNITY_EDITOR
     // Validace v Inspectoru - upozorní pokud ID nejsou v BlockRegistry
@@ -55,6 +64,7 @@ public class BiomeClass
         CheckID(registry, blockSurface,    "blockSurface");
         CheckID(registry, blockSubsurface, "blockSubsurface");
         CheckID(registry, blockDeep,       "blockDeep");
+        CheckID(registry, blockBedrock,    "blockBedrock");
 
         if (ores != null)
         {

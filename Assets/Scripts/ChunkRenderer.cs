@@ -19,10 +19,10 @@ public class ChunkRenderer : MonoBehaviour
             for (int y = 0; y < worldData.worldHeight; y++)
             {
                 // Zjistí textové ID bloku na těchto souřadnicích (např. "stone" nebo "")
-                string blockID = worldData.GetBlock(x, y);
+                ushort blockID = worldData.GetBlock(x, y);
 
                 // Pokud je tam prázdno (vzduch), přeskočí to a jde na další blok
-                if (string.IsNullOrEmpty(blockID))
+                if (blockID == BlockRegistry.Air)
                     continue;
 
                 // Podle textového ID najde v registrech skutečný Tile s grafikou
@@ -31,7 +31,7 @@ public class ChunkRenderer : MonoBehaviour
                 // Pokud grafika pro tohle ID neexistuje, vyhodí varování a přeskočí
                 if (tile == null)
                 {
-                    Debug.LogWarning($"ChunkRenderer: Block '{blockID}' nemá tile v BlockRegistry!");
+                    Debug.LogWarning($"ChunkRenderer: Block '{blockRegistry.GetName(blockID)}' nemá tile v BlockRegistry!");
                     continue;
                 }
 
@@ -41,13 +41,13 @@ public class ChunkRenderer : MonoBehaviour
     }
 
     // Přepíše jen jeden konkrétní blok (volá se za běhu hry při těžbě nebo stavění)
-    public void UpdateTile(int x, int y, string blockID)
+    public void UpdateTile(int x, int y, ushort blockID)
     {
         // Připraví si souřadnice v mřížce
         Vector3Int cellPos = new Vector3Int(x, y, 0);
 
         // Pokud je nové ID prázdné (blok byl vytěžen)
-        if (string.IsNullOrEmpty(blockID))
+        if (blockID == BlockRegistry.Air)
         {
             // .smaže z této pozice Tile (přepíše ho na null = vzduch)
             tilemap.SetTile(cellPos, null);
@@ -58,7 +58,7 @@ public class ChunkRenderer : MonoBehaviour
         TileBase tile = blockRegistry.GetTile(blockID);
         if (tile == null)
         {
-            Debug.LogWarning($"ChunkRenderer: Block '{blockID}' nemá tile v BlockRegistry!");
+            Debug.LogWarning($"ChunkRenderer: Block '{blockRegistry.GetName(blockID)}' nemá tile v BlockRegistry!");
             return;
         }
 
