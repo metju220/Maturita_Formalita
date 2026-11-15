@@ -31,13 +31,16 @@ public class TerrainGeneration : MonoBehaviour
     [Header("World Settings")]
     [Tooltip("Zapnuto = při každém spuštění nový náhodný svět. Vypnuto = použije se seed níže (stejný svět jde vygenerovat znovu).")]
     public bool randomSeed = true;
-    public float seed;
+    public int seed;
 
     [Header("Terrain Settings")]
     [Range(0.005f, 0.05f)]
     public float terrainScale = 0.01f; // Jak moc jsou kopce vysoke
     public int minTerrainHeight = 20;  // Minimální výška terénu
     public int maxTerrainHeight = 60;  // Maximální výška terénu
+
+    [Header("Caves")]
+    public CaveSettings caveSettings = new CaveSettings();
 
     // Preview biomů a ores
     private void OnValidate()
@@ -75,7 +78,7 @@ public class TerrainGeneration : MonoBehaviour
     {
         // 1. Seed světa - buď náhodný, nebo ten z Inspectoru
         if (randomSeed)
-            seed = Random.Range(-10000f, 10000f);
+            seed = Random.Range(-10000, 10000);
         Debug.Log($"[World] Seed: {seed}");
 
         // 2. Příprava polí pro data světa
@@ -228,7 +231,7 @@ public class TerrainGeneration : MonoBehaviour
     // generátor jeskyní
     void GenerateCavesWorm()
     {
-        WormCaveGenerator.GenerateCaves(worldData, seed);
+        WormCaveGenerator.GenerateCaves(worldData, seed, caveSettings);
     }
 
     // Vrací správný blok pro biom na základě hloubky

@@ -856,6 +856,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BlockInteraction
   worldData: {fileID: 484369166}
   chunkRenderer: {fileID: 484369167}
+  blockRegistry: {fileID: 11400000, guid: 6b3cbe14b550d5f499f93594ea0003b6, type: 2}
   miningRadius: 4
   highlightColor: {r: 1, g: 0, b: 0.19160914, a: 1}
 --- !u!1660057539 &9223372036854775807
